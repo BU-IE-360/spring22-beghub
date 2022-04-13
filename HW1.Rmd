@@ -1,0 +1,249 @@
+
+---
+title: "IE360 Homework1 - Spring 2022"
+author: "Begüm Tüzüner"
+output: 
+  html_document: 
+    code_folding : hide 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(lubridate) 
+#install.packages("viridis")
+#install.packages("readxl")
+library(viridis)
+#library(readr)
+library(readxl)
+
+```
+
+### 1- Examining the Monthly Data regarding the Banks in terms of Credit Cards and Loans
+
+This data will show us the details of Bank and Credit Card Expenditure of Turkey month by month in the years between 2015-2021. More information about the topic can be seen in [EVDS](https://evds2.tcmb.gov.tr/index.php?/evds/serieMarket). 
+
+
+```{r}
+credit <- read_excel("C:/Users/btuzuner/Downloads/toplam kredi_harcamalar.xlsx")
+credit$Month <- as.Date(parse_date_time(credit$Month ,"Ym"),
+                             format = "%Y-%m-%d")
+plot(credit$Month, credit$expenditure, type = "l",
+     xlab = "Time",
+     ylab = "Index",main = "Bank and Credit Card Expenditure of Turkey",col="brown4")
+
+```
+
+
+With a very first rough look, it can be seen in the graph that there is an increasing trend and seasonality. At the beginning of year 2020, there is an unexpected decrease in the expenditures. The main reason can be Covid-19 Pandemic, which can be easily predicted. The increase between years 2020-2022 can be explained with such a perspective: With the increased foreign currency rates and unemployment rate caused by also pandemic people tend to use more credit cards. 
+
+Unfortunately this trend is not linear, so if we want to work with linear regression it would be better to use logarithm of the data to obtain a more linear graph. 
+
+
+```{r}
+par(mfrow=c(1,3))
+hist(credit$expenditure[1:12], col = "cyan",  breaks = 4, xlab = "Bank and Credit Card Expenditure", main = "2015")
+hist(credit$expenditure[13:24], col = "cyan4",  breaks = 4,xlab = "Bank and Credit Card Expenditure", main = "2016")
+hist(credit$expenditure[25:36], col = "aquamarine3",  breaks = 4, xlab= "Bank and Credit Card Expenditure", main = "2017")
+hist(credit$expenditure[36:48], col = "blue",  breaks = 4,xlab = "Bank and Credit Card Expenditure", main = "2018")
+hist(credit$expenditure[49:60], col = "bisque1", breaks = 4, xlab = "Bank and Credit Card Expenditure", main = "2019")
+hist(credit$expenditure[61:72], col = "cornsilk3",  breaks = 4,xlab = "Bank and Credit Card Expenditure", main = "2020")
+hist(credit$expenditure[73:84], col = "antiquewhite",breaks = 4, xlab = "Bank and Credit Card Expenditure", main = "2021")
+
+
+```
+
+
+As proposed above, the histograms shows us how each year is similar with the others. However, some years are more related than others. In the years between 2015-2017, the expenditures seems more likely. Also, 2018 and 2019 has similarities. On the other hand, as seen in Figure 1, 2020 and 2021 have unexpected patterns. Due to this fact, their histograms are slightly different than others.
+
+
+```{r}
+boxplot(credit$expenditure[1:12],
+        credit$expenditure[13:24],
+        credit$expenditure[25:36],
+        credit$expenditure[36:48],
+        credit$expenditure[49:60],
+        credit$expenditure[61:72],
+        credit$expenditure[73:84],
+        names = c("2015","2016","2017","2018","2019","2020", "2021"),col = c("cyan","cyan4","aquamarine3", "blue","bisque1","cornsilk3","chocolate3"), main = "Bank and Credit Card Expenditure Yearly")
+
+
+```
+
+
+When we look at the box plots, the claim stated above can be seen more clearly. 2021 has a wider interquantile range and whiskers. Increasing trend can also be seen here.
+
+
+```{r}
+
+bankcredit <- read_excel("C:/Users/btuzuner/Downloads/toplam kredi_harcamalar.xlsx", "credit")
+boxplot(bankcredit$credit[1:12],
+        bankcredit$credit[13:24],
+        bankcredit$credit[25:36],
+        bankcredit$credit[36:48],
+        bankcredit$credit[49:60],
+        bankcredit$credit[61:72],
+        bankcredit$credit[73:84],
+        names = c("2015","2016","2017","2018","2019","2020", "2021"),col = c("cyan","cyan4","aquamarine3", "blue","bisque1","cornsilk3","chocolate3"), main = "Loans Issued By the Banks Yearly")
+```
+
+
+By examining Loans Issued By the Banks Yearly graph, it can be said that there is a positive correlation between Loans Issued By the Banks & Bank and Credit Card Expenditures. The outliers in 2021 boxplot is parallel with the claim, there is an unexpected increase both loans and expenditures may be causing by turkish lira depreciation, low wages and pandemic.
+
+```{r}
+bankcredit$Month <- as.Date(parse_date_time(bankcredit$Month ,"Ym"),
+                             format = "%Y-%m-%d")
+plot(bankcredit$Month, bankcredit$credit, type = "l",
+     xlab = "Time",
+     ylab = "Index",main = "Loans Issued By the Banks in Turkey",col="brown4")
+```
+
+
+It may be beneficial to look whole Loans Issued By the Banks in Turkey graph to consider details of the data. Although there is no seasonality, increasing trend and the increased slope towards 2022 can be easily seen. 
+
+Finally, there is a correlation between Loans Issued By the Banks in Turkey and Bank and Credit Card Expenditures. Besides, there can be further explanations and investigation in this area. 
+
+### 2- House Sales Statistics and Related Key Words in Google Search
+
+```{r}
+house <- read_excel("C:/Users/btuzuner/Downloads/2konut satis.xlsx")
+house$Month <- as.Date(parse_date_time(house$Month ,"Ym"),
+                             format = "%Y-%m-%d")
+par(mfrow=c(1,2))
+ggplot(data = house, aes(x = Month, y = house)) + geom_line(color ="black") +
+  geom_smooth(fill = NA, color="red",linetype = "twodash", size = 1) +
+  labs(title = "House Sales Statistics",
+       x = "Time",
+       y = "Sales" ) +
+  scale_x_date(date_breaks = "12 month",
+               date_labels = "%Y %b",
+               date_minor_breaks = "1 month") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_y_continuous(breaks = seq(from = 0,to = 8,by = 1),
+                     minor_breaks = seq(from = 0,to = 9,by = .2))
+
+
+```
+
+
+By examining the data gathered from EVDS about House Sales in Turkey by monthly in the years between 2013-2021, it can be seen that house sales has an increasing trend with some fluctuations and unexpected rises. The data has almost same mean and variance until 2019 June. After this date, the graph shows steep rise and falls.  The fall in 2020 can be related with pandemic. With the elimination of the pandemic's effects, at the end of 2021, the sector has gained its dynamic again and sales increased. 
+
+```{r}
+par(mfrow=c(1,3))
+hist(house$house[1:12], col = "cyan",  breaks = 4, xlab = "Bank and Credit Card Expenditure", main = "2013")
+hist(house$house[13:24], col = "cyan4",  breaks = 4,xlab = "Bank and Credit Card Expenditure", main = "2014")
+hist(house$house[25:36], col = "aquamarine3",  breaks = 4, xlab= "Bank and Credit Card Expenditure", main = "2015")
+hist(house$house[36:48], col = "blue",  breaks = 4,xlab = "Bank and Credit Card Expenditure", main = "2016")
+hist(house$house[49:60], col = "bisque1", breaks = 4, xlab = "Bank and Credit Card Expenditure", main = "2017")
+hist(house$house[61:72], col = "cornsilk3",  breaks = 4,xlab = "Bank and Credit Card Expenditure", main = "2018")
+hist(house$house[73:84], col = "antiquewhite",breaks = 4, xlab = "Bank and Credit Card Expenditure", main = "2019")
+hist(house$house[85:96], col = "red",  breaks = 4,xlab = "Bank and Credit Card Expenditure", main = "2020")
+hist(house$house[97:108], col = "darkgreen",breaks = 4, xlab = "Bank and Credit Card Expenditure", main = "2021")
+```
+
+
+
+The graphs seem quite similar; however, it cannot be said that they have same qualities. Seasonality should be questioned if it will be regressed. 
+
+```{r}
+for_sale <- read.csv("C:/Users/btuzuner/Downloads/satilik.csv")
+for_sale$Month <- as.Date(parse_date_time(for_sale$Month ,"Ym"),
+                             format = "%Y-%m-%d")
+ggplot(data = for_sale, aes(x = Month, y = for_sale)) + geom_line(color ="black") +
+  geom_smooth(fill = NA, color="red",linetype = "twodash", size = 1) +
+  labs(title = "Sales Search Statistics",
+       x = "Time",
+       y = "Sales" ) +
+  scale_x_date(date_breaks = "12 month",
+               date_labels = "%Y %b",
+               date_minor_breaks = "1 month") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_y_continuous(breaks = seq(from = 0,to = 8,by = 1),
+                     minor_breaks = seq(from = 0,to = 9,by = .2))
+```
+
+
+The word "satılık" searched in Google may be reasonable to compare with House Sales Statistics. According to the data from Google Trends, it can be observed some correlation between those two. the rise&fall in 2020 can be seen clearly above. However, mean and variance of the years 2013-2019 is not so alike with the House Sales Statistics. So, further search can be made for "satılık ev" to be more precise.
+
+```{r}
+house_sale <- read.csv("C:/Users/btuzuner/Downloads/satilik ev.csv")
+house_sale$Month <- as.Date(parse_date_time(house_sale$Month ,"Ym"),
+                             format = "%Y-%m-%d")
+ggplot(data = house_sale, aes(x = Month, y = sale)) + geom_line(color ="black") +
+  geom_smooth(fill = NA, color="red",linetype = "twodash", size = 1) +
+  labs(title = "House Sales Search Statistics",
+       x = "Time",
+       y = "Sales" ) +
+  scale_x_date(date_breaks = "12 month",
+               date_labels = "%Y %b",
+               date_minor_breaks = "1 month") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_y_continuous(breaks = seq(from = 0,to = 8,by = 1),
+                     minor_breaks = seq(from = 0,to = 9,by = .2))
+```
+
+
+The data obtained from Google Trends for the key word "satılık ev" is given above. The trend line between 2013-2019 seems more similar with the House Sales and 2020 fluctuations can be seen. Though, there is still nonconstant mean between 2013-2019 and the sudden fluctuations in 2019 and 2021 are missing. 
+
+So, we can roughly look at the correlations for both with house sales: 
+
+```{r}
+cor(house_sale$sale, as.numeric(house$house))
+cor(for_sale$for_sale, as.numeric(house$house))
+```
+As 0.65 < 0.68, the correlation between "satılık" and house sales is higher than "satılık ev" and house sales. 
+
+
+### 3- Employment in Turkey
+
+The employment data is obtained from EVDS in terms of rates. The data is gathered monthly the years between 2014-2021. 
+```{r}
+employment <- read_excel("C:/Users/btuzuner/Downloads/istihdam.xlsx")
+employment$Month <- as.Date(parse_date_time(employment$Month ,"Ym"),
+                             format = "%Y-%m-%d")
+ggplot(data = employment, aes(x = Month, y = workforce)) + geom_line(color = "purple", size = 1) +
+  scale_color_viridis(option = "B") +
+  labs(title="Employment Rate in Turkey", y = "Employment Rate", x = "Years") +
+  theme(plot.title=element_text(hjust=0.5),axis.line = element_line(colour = "black", size=1))
+
+
+```
+
+
+In the plot, it can be seen that there is a clear seasonality. Employment rates are low at the begining and end of each year excecept 2020 and forward. The shape of the curves has changed in the year 2018. While in the previous years the beginning is lower than the end of each year; in 2018, like a mirror effect, the beginning is gretaer than the end. This situation hold until the pandemic arrives to Turkey, March 2020. The curve, again, reaches the previous version after this time. The difference in 2018-2020 can be a good investigation subject. 
+
+For the years toward 2022, as the effects of pandemic eliminated, the employment rate is increased. 
+
+```{r}
+
+boxplot(employment$workforce[1:12],
+        employment$workforce[13:24],
+        employment$workforce[25:36],
+        employment$workforce[36:48],
+        employment$workforce[49:60],
+        employment$workforce[61:72],
+        employment$workforce[73:84],
+        employment$workforce[85:96],
+        names = c("2014", "2015","2016","2017","2018","2019","2020", "2021"),col = c("cyan","cyan4","aquamarine3", "blue","bisque1","cornsilk3","chocolate3"), main = "Bank and Credit Card Expenditure Yearly")
+
+```
+
+
+Boxplot of the data show the linear line between years 2014-2018, steep decrease in 2020 and unusual behaviour in 2019 and 2021. The characterictics are quite different for 2014-2016 and 2017-2018. 
+```{r}
+job <- read.csv("C:/Users/btuzuner/Downloads/is ilani.csv")
+job$Month <- as.Date(parse_date_time(job$Month ,"Ym"),
+                             format = "%Y-%m-%d")
+ggplot(data = job, aes(x = Month, y = job_ad)) + geom_line(color = "purple", size = 1) + scale_color_viridis(option = "B") +
+  labs(title="Google Trends for 'iş ilanı'", y = "Job Search", x = "Years") +
+  theme(plot.title=element_text(hjust=0.5),axis.line = element_line(colour = "black", size=1))
+
+
+```
+
+
+Searches on Google for job can be a good start to analyze the data. The data is obtained from Google Trends for years 2014-2021 by monthly. The cycles of the data is quite different compared to Employment Rate Statistics. However, increasing trend overall and effects of pandemic are quite similar.
+
+
+
+
