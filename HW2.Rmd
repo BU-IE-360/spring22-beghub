@@ -1,0 +1,257 @@
+---
+title: "Homework 2"
+author: "Begüm Tüzüner"
+date: '2022-05-07'
+output: 
+  html_document:
+    code_folding: hide
+    toc: true
+    toc_depth: 2
+    toc_float: true
+    theme: sandstone
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#install.packages("readr")
+#install.packages("naniar")
+library(naniar)
+library(readr)
+library(data.table)
+library(ggplot2)
+library(GGally)
+library(forecast)
+library(zoo)
+library(ggcorrplot)
+library(gridExtra)
+library(lubridate)
+require(graphics)
+library(dplyr)
+```
+
+## Introduction
+
+In this homework, a linear regression model will be conducted based on the provided data by the instructor which contains gasoline and diesel sales (in 1000 m3) of a major distributor between 2000 and 2007, and a number of potential independent variables. These variables are summarized as follows:
+
+UGS: Unleaded gasoline sale in a given quarter,
+RNUV: An index indicating the rate of new unleaded gasoline using vehicles being added to the traffic in
+a quarter,
+PU: Average price (adjusted with an index) of a liter of unleaded gasoline in a quarter,
+PG: Average price (adjusted with an index) of a liter of diesel gasoline in a quarter,
+NUGV: Number of unleaded gasoline using vehicles in the traffic,
+NDGV: Number of diesel gasoline using vehicles in the traffic (per 1000 people),
+GNPA: Agriculture component of Gross National Product (adjusted with an index),
+GNPC: Commerce component of Gross National Product (adjusted with an index),
+GNP: Grand total for GNP (agriculture, commerce and other components total).
+
+The ultimate aim is to predict UGS (Unleaded Gasoline Sale) for missing 4 Quarters in 2007. To do that, seasonality, lags and trend in data should be considered.
+
+## Approach
+
+Before starting to the model, small manipulations on excel file has been made such as eliminating the spaces between numbers to prevent to be read as characters, reorganizing Quarter column and etc. To begin with, to see more clearly, UGS as a time series function and auto-correlated function of UGS will be plotted. 
+
+```{r, fig.align='center'}
+hw2 <- read_csv("C:/Users/btuzuner/Downloads/IE360_Spring22_HW2_data.csv")
+hw2$Quarter <- as.Date(parse_date_time(hw2$Quarter ,"Ym"),
+                             format = "%Y-%m")
+plot(hw2$Quarter, hw2$UGS, type = "l",
+     xlab = "Time",
+     ylab = "Index",main = "Unleaded Gasoline Sale (UGS)",col="darkred")
+
+```
+
+
+As seen above, UGS has a decreasing trend with seasonality. Also, there is no evidence to proof this function has white-noise property. Just the opposite, there is non-zero mean with non-constant variance. 
+
+
+```{r , fig.align='center'}
+acf_ugs <- acf(hw2$UGS,28, plot = FALSE)
+plot(acf_ugs, main = "Autocorelation Function of UGS")
+```
+
+
+In autocorrelation function, there is two peak lags (lag0 and lag4) above the line which may misdirect the model. It means that UGS values are dependent each other in some aspect. At a very beginning step, putting these lags as independent variables to the regression model may be a good start.Of course, adding lag0 changes nothing, so I will work with lag1. 
+
+
+```{r, fig.align='center'}
+
+lag1 <- c(0, hw2$UGS)
+hw2 <- cbind(hw2,lag1=lag1[1:28])
+hw2 <- hw2 %>% replace_with_na(replace = list(lag1 = 0))
+head(hw2)
+hw2 <- data.table(hw2)
+hw2[, lag4:= shift(UGS,4)]
+
+d_UGS <- ts(hw2$UGS, frequency = 4, start= c(2000,1))
+dec <- decompose(d_UGS, type = "additive")
+
+
+
+fit1 <- lm(UGS~
+             dec$trend +dec$seasonal 
+           # + lag4 
+           # + hw2$`Price of Unleaded Gasoline (PU)`
+           # +hw2$`Price of Diesel Gasoline (PG)`
+           # +hw2$`GNP Agriculture`
+            # +hw2$`# LPG Vehicles (NLPG)`
+           # +hw2$`# of Diesel Gasoline Vehicles (NDGV)`
+           # +hw2$`# Unleaded Gasoline Vehicles (NUGV)`
+           , data = hw2)
+summary(fit1)
+checkresiduals(fit1)
+```
+
+
+The code above creates the seasonality (quarters) and trend of UGS via decompose() function. Also, lag1 and lag4 are created to use in the model. As we can see, the linear model for trend and seasonality works quite well. Both variables are significant and Multiple and Adjusted R squared values are close to 1.  So, let's add lagged variables to this model. 
+
+Adding both lag1 and lag4 variables make the model terrible. The reason under this circumstance may be using both lagged variables misguide the model. So, putting only lag4 would give better results and it will be proceeded with this variable.
+
+The next step is to determine which independent variables will be used. For this purpose, correlation matrix of the data set is created. Before the correlation matrix, the Quarter variable and lagged variables attached to data set will be eliminated with a small manipulation. 
+
+```{r, fig.width=15, fig.align='center'}
+hw2_no_lag <- read_csv("C:/Users/btuzuner/Downloads/IE360_Spring22_HW2_data.csv")
+hw2_no_lag <- select(hw2_no_lag, -1)
+ggcorrplot(cor(hw2_no_lag), 
+           type = "lower",
+           lab = TRUE,
+           title = "Correlation Among Independent Variables")
+          
+
+
+```
+
+
+As seen in the "Correlation Among Independent Variables" plot, the maximum absolute value for UGS correlation is between UGS and NLPG. Therefore, first independent variable should be added to the model is NLPG. Let's see the current linear model. 
+
+```{r, fig.align='center'}
+fit2 <- lm(UGS~
+             dec$trend +dec$seasonal 
+            + lag4 
+             +hw2$`# LPG Vehicles (NLPG)`
+           , data = hw2)
+summary(fit2)
+```
+
+
+Multiple and Adjusted R squared values have decreased and get worse while the p-value and F Statistics getting better. The decrease is acceptable. The interesting point in this model is that except trend and seasonal variables, all variables are insignificant. The reason of it can be interpreted as follows: Decompose function has high significance on creating trend and seasonal variables. These variables also has effect on the other variables' trend and seasonality. Other than their correlation on trend and seasonality, the remaining randomness should be investigated. 
+
+For that purpose, it will be focused on the correlation among the random part of decompose() function and other independent variables. 
+
+
+```{r, fig.width=15, fig.align='center'}
+random <- cbind(hw2_no_lag, dec$random)
+random <- select(random,-1)
+random <- random %>% slice(-c(1,2, 27, 28))
+ggcorrplot(cor(random), 
+           type = "lower",
+           lab = TRUE) + 
+           labs(title = "Correlation Among Independent Variables and Randomness of UGS")
+
+```
+
+The maximum absolute value between random part of UGS and independent variables is for PU and PG. So, they are selected top be add in the model. 
+
+
+```{r, fig.align='center'}
+fit3 <- lm(UGS~
+             dec$trend +dec$seasonal
+            + lag4 
+            + hw2$`Price of Unleaded Gasoline (PU)`
+            +hw2$`Price of Diesel Gasoline (PG)`
+           , data = hw2)
+summary(fit3)
+```
+
+Multiple and Adjusted R squared values increased, F statisctics, p value and Residual Error decreased. In other words, the model got better in all aspects compared with the previous one. Also, the same situation for significance hold. Now, it is time to see the statistical evidence supporting the validity of the analysis. 
+
+```{r, fig.align='center'}
+checkresiduals(fit3)
+```
+
+ACF has lags above the line, so this model may not be well. Adding trend and quarter components manually and as factor may give better residual results. 
+
+
+```{r, fig.align='center'}
+trend = seq(32,5,by=-1)
+quarter=seq(1,4,by=1)
+hw2_factor = cbind(hw2,quarter)
+hw2_factor = cbind(hw2_factor,trend)
+
+fit_factor <- lm(UGS~
+             trend + as.factor(quarter)
+             +hw2_factor$`# LPG Vehicles (NLPG)`
+           , data = hw2_factor)
+summary(fit_factor)
+checkresiduals(fit_factor)
+
+```
+
+Thus, all the variables are significant now. Multiple and Adjusted R squared values are well and ACF seems better since there is no lag. Residuals are closer to normal distribution than the previous model. If more independent variables are added in the model, the added variables are not significant as seen above. The reason behind that could be high correlation between the independent variables. Effect of the second independent variable cannot be considered reasonable by the model due to that reason.
+
+```{r, fig.align='center'}
+error = hw2$UGS - predict(fit_factor)
+n=length(hw2$UGS)
+  
+mean=mean(hw2$UGS)
+sd=sd(hw2$UGS)
+bias = sum(error)/sum(hw2$UGS)
+mape = sum(abs(error/hw2$UGS))/length(hw2$UGS)
+mad = sum(abs(error))/length(hw2$UGS)
+wmape = mad/mean
+print(data.frame(BIAS = bias,MAPE =  mape, MAD = mad,WMAPE = wmape))
+```
+
+Bias is really small and also other error terms are quite well. This means, it can be proceeded with this model. 
+
+## Prediction 
+
+Now, it is time to predict missing 4 quarters in 2007. The last model with statistical analysis will be used for prediction to see if its plot is how much close to the actual plot.
+
+This time, the original excel file will be reread for gathering all the unmanipulated data. 
+```{r, fig.align='center'}
+hw2_na <- read_csv("C:/Users/btuzuner/Downloads/IE360_Spring22_HW2_data (1).csv")
+hw2_na$Quarter <- as.Date(parse_date_time(hw2_na$Quarter ,"Ym"),
+                             format = "%Y-%m")
+hw2_na <- data.table(hw2_na)
+setnames(x= hw2_na, old= "Unleaded Gasoline Sale (UGS)", new = "UGS")
+
+trend = seq(32,1,by=-1)
+quarter=seq(1,4,by=1)
+hw2_na = cbind(hw2_na,quarter)
+hw2_na = cbind(hw2_na,trend)
+
+
+fit_factor1 <- lm(UGS~
+             trend + as.factor(quarter)
+             + hw2_na$`# LPG Vehicles (NLPG)`
+           , data = hw2_na, na.rm=TRUE )
+predictf <- predict(object=fit_factor1,newdata = hw2_na)
+print(data.frame(predictf[29:32]))
+
+
+```
+
+
+```{r, fig.align='center'}
+
+hw2_na <- cbind(hw2_na, predictf)
+hw2_na$Quarter <- as.Date(hw2_na$Quarter)
+                             
+ggplot() + 
+  geom_line(data = hw2_na, aes(x = Quarter, y = UGS ,color = "actual")) +
+  geom_line(data = hw2_na, aes(x = Quarter, y = predictf ,color = "fitted")) +
+  labs(title = "Predicted vs. Actual Unleaded Gasoline Sales (UGS)",
+    subtitle = "2000 Q1 - 2007 Q4",
+    x = "Time",
+    y = "Unleaded Gasoline Sales (UGS)",
+    color = "Color") +
+  theme_minimal()
+
+```
+
+
+## Conclusion 
+
+To conclude, several types fo variables, methods and linear models have been tried to obtain a reasonable predicted values for UGs data in 2017 for 4 quarters. The predictions seem acceptable in terms of statistical evidence and physical appeareance as seen above. 
+
+In this homework, it can be easily seen that adding more variables may not always be a good method for fit. The possible options should be tested and than the model should be established. 
